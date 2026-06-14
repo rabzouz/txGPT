@@ -18,6 +18,7 @@ txGPT is a Go-based command-line assistant that uses the OpenAI API to generate 
 | JSON output | `--json` returns `{ "response": "...", "data": [...] }` for scripts and post-processing. |
 | Rich display | `txgpt_rich.sh` pipes JSON output into `rich_display.py` for a formatted terminal view. |
 | Nmap data extraction | Common `port/state/service` lines are extracted into JSON rows. |
+| Tool presets | `--tool` focuses txGPT on PowerShell, Bash, Nmap, Git, Docker, Regex, SQL, Python or debugging. |
 
 ## Prerequisites
 
@@ -70,6 +71,8 @@ txgpt "Generate a Bash script that backs up /var/www to /tmp."
 txgpt --lang fr "Explique chmod 750 avec un exemple."
 txgpt --stream --role "Kali Linux expert" "Explain a safe Nmap service scan."
 txgpt --json "Show sample Nmap output with open SSH and HTTP ports."
+txgpt --list-tools
+txgpt --tool powershell --lang fr "Ecris un script pour lister les processus"
 ```
 
 Interactive mode:
@@ -103,10 +106,37 @@ txgpt --exec "Create a harmless command that prints the current directory."
 | `--exec` | Confirm and run the first generated code block or command. |
 | `--lang en\|fr` | Choose English or French. |
 | `--role "..."` | Add a role instruction to the system prompt. |
+| `--tool "..."` | Use a focused tool preset. |
+| `--list-tools` | List available tool presets and exit. |
 | `--model "..."` | Override the default model. |
 | `--temperature 0.7` | Set sampling temperature from `0.0` to `2.0`. |
 | `--max-tokens 1000` | Set a response token limit. `0` lets the API choose. |
 | `--base-url "..."` | Use an OpenAI-compatible base URL. |
+
+## Tool Presets
+
+Tool presets tune the system prompt without changing the model or requiring extra dependencies.
+
+```bash
+txgpt --list-tools
+txgpt --tool powershell --lang fr "Explique Get-Process"
+txgpt --tool nmap --lang fr "Propose un scan de service pour mon lab local"
+txgpt --tool git "Help me understand this merge conflict"
+```
+
+Available tools:
+
+| Tool | Focus |
+| --- | --- |
+| `bash` | Linux shell commands and scripts. |
+| `debug` | Step-by-step troubleshooting. |
+| `docker` | Dockerfiles, Compose and containers. |
+| `git` | Git commands and workflows. |
+| `nmap` | Authorized Nmap scanning. |
+| `powershell` | Windows PowerShell commands and scripts. |
+| `python` | Python scripts and automation. |
+| `regex` | Regular expressions. |
+| `sql` | SQL queries and database troubleshooting. |
 
 ## Development
 

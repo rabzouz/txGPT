@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,70 @@ import (
 type jsonResponse struct {
 	Response string     `json:"response"`
 	Data     [][]string `json:"data,omitempty"`
+}
+
+type toolPreset struct {
+	Name        string
+	Description string
+	English     string
+	French      string
+}
+
+var toolPresets = map[string]toolPreset{
+	"bash": {
+		Name:        "bash",
+		Description: "Linux shell commands and scripts",
+		English:     "Focus on Bash and POSIX shell commands. Prefer portable, readable commands and explain risky flags.",
+		French:      "Concentre-toi sur Bash et les commandes shell POSIX. Prefere des commandes lisibles et portables, et explique les options risquées.",
+	},
+	"debug": {
+		Name:        "debug",
+		Description: "Step-by-step troubleshooting",
+		English:     "Act as a debugging assistant. Ask for observable symptoms when needed, isolate causes, and give verification steps.",
+		French:      "Agis comme un assistant de diagnostic. Demande les symptomes observables si necessaire, isole les causes et donne des etapes de verification.",
+	},
+	"docker": {
+		Name:        "docker",
+		Description: "Dockerfiles, Compose and containers",
+		English:     "Focus on Docker, Dockerfiles, Compose, images, containers, volumes and networking. Prefer reproducible commands.",
+		French:      "Concentre-toi sur Docker, Dockerfile, Compose, images, conteneurs, volumes et reseau. Prefere des commandes reproductibles.",
+	},
+	"git": {
+		Name:        "git",
+		Description: "Git commands and workflows",
+		English:     "Focus on Git workflows. Protect user work, avoid destructive commands unless explicitly requested, and explain branch state clearly.",
+		French:      "Concentre-toi sur les workflows Git. Protege le travail utilisateur, evite les commandes destructrices sauf demande explicite, et explique clairement l'etat des branches.",
+	},
+	"nmap": {
+		Name:        "nmap",
+		Description: "Authorized Nmap scanning",
+		English:     "Focus on authorized Nmap usage. Keep commands scoped, explain scan impact, and remind the user to scan only permitted targets.",
+		French:      "Concentre-toi sur l'usage autorise de Nmap. Garde les commandes ciblees, explique l'impact du scan et rappelle de scanner uniquement les cibles autorisees.",
+	},
+	"powershell": {
+		Name:        "powershell",
+		Description: "Windows PowerShell commands and scripts",
+		English:     "Focus on Windows PowerShell. Prefer safe cmdlets, include commands that work in current PowerShell, and explain administrator requirements.",
+		French:      "Concentre-toi sur Windows PowerShell. Prefere les cmdlets sures, donne des commandes compatibles PowerShell, et explique les besoins administrateur.",
+	},
+	"python": {
+		Name:        "python",
+		Description: "Python scripts and automation",
+		English:     "Focus on Python scripts. Prefer standard library solutions first, include clear error handling, and keep examples runnable.",
+		French:      "Concentre-toi sur les scripts Python. Prefere d'abord la bibliotheque standard, ajoute une gestion d'erreur claire et garde les exemples executables.",
+	},
+	"regex": {
+		Name:        "regex",
+		Description: "Regular expressions",
+		English:     "Focus on regular expressions. State the target regex flavor, explain each group, and provide positive and negative examples.",
+		French:      "Concentre-toi sur les expressions regulieres. Precise le moteur regex cible, explique chaque groupe et donne des exemples positifs et negatifs.",
+	},
+	"sql": {
+		Name:        "sql",
+		Description: "SQL queries and database troubleshooting",
+		English:     "Focus on SQL. Prefer parameterized queries, mention indexes when relevant, and avoid unsafe data modification without a backup step.",
+		French:      "Concentre-toi sur SQL. Prefere les requetes parametrees, mentionne les index si utile, et evite les modifications dangereuses sans etape de sauvegarde.",
+	},
 }
 
 func main() {
@@ -39,6 +104,8 @@ func run(args []string) error {
 	execute := flags.Bool("exec", false, "ask for confirmation, then execute the first generated code block")
 	lang := flags.String("lang", "en", "answer language: en or fr")
 	role := flags.String("role", "", "role preset appended to the system prompt")
+	tool := flags.String("tool", "", "tool preset to use; run --list-tools to see available tools")
+	listTools := flags.Bool("list-tools", false, "list available tool presets and exit")
 	model := flags.String("model", cfg.Model, "OpenAI model name")
 	temperature := flags.Float64("temperature", 0.7, "sampling temperature from 0.0 to 2.0")
 	maxTokens := flags.Int("max-tokens", cfg.MaxTokens, "maximum output tokens; 0 lets the API choose")
@@ -49,6 +116,10 @@ func run(args []string) error {
 			return nil
 		}
 		return err
+	}
+	if *listTools {
+		printToolList()
+		return nil
 	}
 	if *execute && *asJSON {
 		return fmt.Errorf("--exec cannot be combined with --json")
@@ -65,7 +136,11 @@ func run(args []string) error {
 	cfg.Temperature = float32(*temperature)
 	cfg.MaxTokens = *maxTokens
 	cfg.BaseURL = strings.TrimSpace(*baseURL)
-	cfg.SystemPrompt = systemPromptFor(*lang, *role)
+	systemPrompt, err := systemPromptFor(*lang, *role, *tool)
+	if err != nil {
+		return err
+	}
+	cfg.SystemPrompt = systemPrompt
 	if *asJSON {
 		cfg.Stream = false
 	}
@@ -147,9 +222,10 @@ func askAndPrint(prompt string, history []openai.ChatCompletionMessage, cfg ai.C
 	return response, nil
 }
 
-func systemPromptFor(lang string, role string) string {
+func systemPromptFor(lang string, role string, tool string) (string, error) {
 	normalizedLang := strings.ToLower(strings.TrimSpace(lang))
 	normalizedRole := strings.TrimSpace(role)
+	normalizedTool := strings.ToLower(strings.TrimSpace(tool))
 
 	var prompt string
 	switch normalizedLang {
@@ -164,7 +240,44 @@ func systemPromptFor(lang string, role string) string {
 			prompt += " Adopt this role: " + normalizedRole + "."
 		}
 	}
-	return prompt
+
+	if normalizedTool == "" {
+		return prompt, nil
+	}
+
+	preset, ok := toolPresets[normalizedTool]
+	if !ok {
+		return "", fmt.Errorf("unknown tool %q; run --list-tools", tool)
+	}
+	if isFrench(normalizedLang) {
+		prompt += " Outil actif: " + preset.Name + ". " + preset.French
+	} else {
+		prompt += " Active tool: " + preset.Name + ". " + preset.English
+	}
+	return prompt, nil
+}
+
+func isFrench(normalizedLang string) bool {
+	switch normalizedLang {
+	case "fr", "fra", "fre", "french", "francais", "français":
+		return true
+	default:
+		return false
+	}
+}
+
+func printToolList() {
+	names := make([]string, 0, len(toolPresets))
+	for name := range toolPresets {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	fmt.Println("Available txGPT tools:")
+	for _, name := range names {
+		preset := toolPresets[name]
+		fmt.Printf("  %-10s %s\n", preset.Name, preset.Description)
+	}
 }
 
 func extractStructuredData(text string) [][]string {

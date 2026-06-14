@@ -41,9 +41,36 @@ func TestExtractFirstCodeBlock(t *testing.T) {
 }
 
 func TestSystemPromptLanguageAndRole(t *testing.T) {
-	got := systemPromptFor("fr", "expert Kali")
+	got, err := systemPromptFor("fr", "expert Kali", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if !strings.Contains(got, "Adopte le rôle suivant: expert Kali.") {
 		t.Fatalf("expected French role prompt, got %q", got)
+	}
+}
+
+func TestSystemPromptToolPreset(t *testing.T) {
+	got, err := systemPromptFor("fr", "", "powershell")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(got, "Outil actif: powershell.") {
+		t.Fatalf("expected PowerShell tool prompt, got %q", got)
+	}
+	if !strings.Contains(got, "Windows PowerShell") {
+		t.Fatalf("expected PowerShell guidance, got %q", got)
+	}
+}
+
+func TestSystemPromptUnknownTool(t *testing.T) {
+	_, err := systemPromptFor("en", "", "unknown")
+	if err == nil {
+		t.Fatal("expected an unknown tool error")
+	}
+	if !strings.Contains(err.Error(), "run --list-tools") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
