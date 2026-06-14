@@ -1,22 +1,19 @@
-#!/bin/bash
-# Utilisation : ./txgpt_rich.sh "ton prompt"
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Vérifie si un prompt est fourni
-if [ -z "$1" ]; then
-    echo "Usage : ./txgpt_rich.sh \"Votre prompt\""
+if [ "$#" -eq 0 ]; then
+    echo "Usage: ./txgpt_rich.sh \"your prompt\""
     exit 1
 fi
 
-PROMPT="$1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TXGPT_BIN="${TXGPT_BIN:-$SCRIPT_DIR/txgpt}"
+PYTHON_BIN="${PYTHON:-python3}"
+PROMPT="$*"
 
-# Exécute txGPT avec --json et capture l'output
-TXGPT_OUTPUT=$(./txgpt --json "$PROMPT")
-
-# Vérifie si txGPT a réussi
-if [ $? -ne 0 ]; then
-    echo "Erreur lors de l'exécution de txGPT."
-    exit 1
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+    PYTHON_BIN="python"
 fi
 
-# Passe l'output à rich_display.py
-python rich_display.py --prompt "$PROMPT" --output "$TXGPT_OUTPUT"
+TXGPT_OUTPUT="$("$TXGPT_BIN" --json "$PROMPT")"
+"$PYTHON_BIN" "$SCRIPT_DIR/rich_display.py" --prompt "$PROMPT" --output "$TXGPT_OUTPUT"

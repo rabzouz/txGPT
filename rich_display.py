@@ -1,53 +1,72 @@
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.markdown import Markdown
 import argparse
+import html
 import json
-import html  # Pour déséchapper les entités HTML comme \u003c
+from typing import Any, List, Optional, Tuple
 
-# Parser pour arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('--prompt', help='Le prompt original')
-parser.add_argument('--output', help='La sortie à afficher (JSON ou texte)')
-args = parser.parse_args()
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.table import Table
 
-console = Console()
 
-# Essayer de parser l'output comme JSON
-try:
-    output_data = json.loads(args.output)
-    response_text = output_data.get('response', 'Aucune réponse')
-    data_rows = output_data.get('data', [])
-except:
-    response_text = args.output or 'Exemple de données'
-    data_rows = []
+def parse_output(raw_output: Optional[str]) -> Tuple[str, List[Any]]:
+    if not raw_output:
+        return "No response received.", []
 
-# Nettoyer les échappements (remplace \\n par \n, déséchappe HTML/Unicode)
-response_text = response_text.replace('\\n', '\n').replace('\\r', '')
-response_text = html.unescape(response_text)  # Gère \u003c -> <, etc.
+    try:
+        payload = json.loads(raw_output)
+    except json.JSONDecodeError:
+        return raw_output, []
 
-# Markdown dynamique pour le header
-markdown_text = f"""
-# Résultats pour : {args.prompt or 'Test'}
-- Prompt original : {args.prompt or 'N/A'}
-"""
+    if not isinstance(payload, dict):
+        return str(payload), []
 
-console.print(Markdown(markdown_text), style="bold blue")
+    response = payload.get("response", "No response received.")
+    rows = payload.get("data", [])
+    return str(response), rows if isinstance(rows, list) else []
 
-# Panel pour la réponse textuelle, rendue comme Markdown
-console.print(Panel(Markdown(response_text), title="Réponse txGPT", style="green", expand=True))
 
-# Tableau si des données sont présentes
-if data_rows:
-    table = Table(title="Données Extraites")
-    # Ajouter des colonnes dynamiquement basées sur la première ligne
-    if data_rows and data_rows[0]:
-        for i in range(len(data_rows[0])):
-            table.add_column(f"Col{i+1}", style="cyan" if i % 2 == 0 else "magenta")
-    for row in data_rows:
-        table.add_row(*row)
-    console.print(table)
+def print_rows(console: Console, rows: List[Any]) -> None:
+    if not rows:
+        return
 
-console.print("[bold red]Fin ! Prêt pour le prochain prompt ?[/bold red]")
+    table = Table(title="Extracted Data")
 
+    first_row = rows[0]
+    if isinstance(first_row, dict):
+        headers = list(first_row.keys())
+        for header in headers:
+            table.add_column(str(header), style="cyan")
+        for row in rows:
+            if isinstance(row, dict):
+                table.add_row(*(str(row.get(header, "")) for header in headers))
+        console.print(table)
+        return
+
+    if isinstance(first_row, list):
+        for index in range(len(first_row)):
+            table.add_column(f"Col{index + 1}", style="cyan" if index % 2 == 0 else "magenta")
+        for row in rows:
+            if isinstance(row, list):
+                table.add_row(*(str(value) for value in row))
+        console.print(table)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Render txGPT JSON output with Rich.")
+    parser.add_argument("--prompt", default="", help="Original prompt")
+    parser.add_argument("--output", default="", help="txGPT output as JSON or plain text")
+    args = parser.parse_args()
+
+    console = Console()
+    response_text, rows = parse_output(args.output)
+    response_text = html.unescape(response_text.replace("\\n", "\n").replace("\\r", ""))
+
+    title = args.prompt or "txGPT"
+    console.print(Markdown(f"# Results for: {title}"), style="bold blue")
+    console.print(Panel(Markdown(response_text), title="txGPT Response", style="green", expand=True))
+    print_rows(console, rows)
+
+
+if __name__ == "__main__":
+    main()

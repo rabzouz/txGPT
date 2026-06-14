@@ -1,0 +1,11 @@
+# Local builds
+/txgpt
+/txgpt.exe
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+
+# Test and coverage output
+coverage.out
+*.test

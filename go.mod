@@ -1,4 +1,4 @@
-module github.com/LotoFoot/txGPT
+module github.com/rabzouz/txGPT
 
 go 1.24.3
 
