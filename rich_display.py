@@ -89,10 +89,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Render txGPT JSON output with Rich.")
     parser.add_argument("--prompt", default="", help="Original prompt")
     parser.add_argument("--output", default="", help="txGPT output as JSON or plain text")
+    parser.add_argument("--output-file", default="", help="Path to a UTF-8 file containing txGPT output")
     parser.add_argument("--title", default="txGPT Response", help="Response panel title")
     args = parser.parse_args()
 
-    response_text, rows = parse_output(args.output)
+    raw_output = args.output
+    if args.output_file:
+        with open(args.output_file, "r", encoding="utf-8-sig") as output_file:
+            raw_output = output_file.read()
+
+    response_text, rows = parse_output(raw_output)
     response_text = html.unescape(response_text.replace("\\n", "\n").replace("\\r", ""))
 
     if not HAS_RICH:

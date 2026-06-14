@@ -9,6 +9,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$env:PYTHONIOENCODING = "utf-8"
 
 if (-not $Prompt -or $Prompt.Count -eq 0) {
     Write-Host 'Usage: .\txgpt_rich.ps1 [-Tool powershell] [-Lang fr] "Votre prompt"'
@@ -35,10 +39,21 @@ if ($Tool) {
 }
 $txArgs += $promptText
 
-$txgptOutput = & $TxgptBin @txArgs
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
-
 $renderer = Join-Path $scriptDir "rich_display.py"
-& $Python $renderer --prompt $promptText --output $txgptOutput --title "txGPT Rich"
+$tempOutput = Join-Path ([System.IO.Path]::GetTempPath()) ("txgpt-rich-{0}.json" -f ([System.Guid]::NewGuid().ToString("N")))
+
+try {
+    & $TxgptBin @txArgs | Out-File -LiteralPath $tempOutput -Encoding utf8
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    & $Python $renderer --prompt $promptText --output-file $tempOutput --title "txGPT Rich"
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+} finally {
+    if (Test-Path -LiteralPath $tempOutput) {
+        Remove-Item -LiteralPath $tempOutput -Force
+    }
+}
