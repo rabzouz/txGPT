@@ -81,12 +81,25 @@ Interactive mode:
 txgpt
 ```
 
-Rich display:
+Rich terminal display:
 
 ```bash
 pip install rich
 chmod +x txgpt_rich.sh
-./txgpt_rich.sh "Generate a safe Nmap scan command for my own lab host."
+./txgpt_rich.sh --tool nmap --lang fr "Propose un scan simple pour mon lab local"
+```
+
+Windows PowerShell:
+
+```powershell
+pip install rich
+.\txgpt_rich.ps1 -Tool powershell -Lang fr "Donne une commande pour afficher la version de PowerShell"
+```
+
+If PowerShell blocks scripts, use the CMD launcher:
+
+```powershell
+.\txgpt_rich.cmd -Tool powershell -Lang fr "Donne une commande pour afficher la version de PowerShell"
 ```
 
 Safe execution:
